@@ -9,13 +9,16 @@ using Telegram.Bot.Types.ReplyMarkups;
 using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Text;
 
 namespace Awesome
 {
     class Program
     {
+        //ServicePointManager.DefaultConnectionLimit = 1000; //TODO Doesnt work, need it for many async requests in parallel: https://stackoverflow.com/questions/2960056/trying-to-run-multiple-http-requests-in-parallel-but-being-limited-by-windows
         static ITelegramBotClient botClient;
         static IDictionary<long, string> userNames = new Dictionary<long, string>();
+        static IList<string> words = new List<string>();
 
         static void Main()
         {
@@ -24,8 +27,13 @@ namespace Awesome
             var me = botClient.GetMeAsync().Result;
             Console.WriteLine($"Hello, World! I am user {me.Id} and my name is {me.FirstName}.");
 
-            
-            var lines = File.ReadAllLines("..\\..\\..\\Files\\userNames.txt");
+            var lines = File.ReadAllLines("..\\..\\..\\Files\\words.txt");
+            foreach (string line in lines)
+            {
+                words.Add(line);
+            }
+
+            lines = File.ReadAllLines("..\\..\\..\\Files\\userNames.txt");
             foreach (string line in lines)
             {
                 string[] keyValue = line.Split(":");
@@ -61,12 +69,12 @@ namespace Awesome
 
         static async void Bot_OnMessage(object sender, MessageEventArgs e)
         {
-            string[] commands = new string[] {"/test", "/name"};
+            string[] commands = new string[] {"/test", "/name", "/zufallstext" };
             var message = e.Message;
             if (message.Text == null || message.Type != MessageType.Text) throw new System.ArgumentException("message is either 0 or != Text"); 
 
             Console.WriteLine($"Received a text message in chat {message.Chat.Id} with the Text \"{message.Text}\" from {message.Chat.FirstName}.");
-            switch (message.Text.Split(" ").First())
+            switch (message.Text.Split(" ").First().ToLower())
             {
                 case "/test":
                     await botClient.SendTextMessageAsync(
@@ -78,10 +86,19 @@ namespace Awesome
                     string[] splitMsg = message.Text.Split(" ", 2);
                     if (splitMsg.Length == 1)
                     {
-                        await botClient.SendTextMessageAsync(
-                            chatId: message.Chat,
-                            text: $"Your Name is {userNames[message.Chat.Id]}"
-                        );
+                        try
+                        {
+                            await botClient.SendTextMessageAsync(
+                                chatId: message.Chat,
+                                text: $"Your Name is {userNames[message.Chat.Id]}"
+                            );
+                        } catch {
+                            await botClient.SendTextMessageAsync(
+                                chatId: message.Chat,
+                                text: $"Define your name first please."
+                            );
+                        }
+                        
                         break;
                     }
                     userNames[message.Chat.Id] = splitMsg[1];
@@ -89,6 +106,52 @@ namespace Awesome
                         chatId: message.Chat,
                         text: $"Your new Name is {splitMsg[1]}"
                     );
+                    break;
+                case "/zufallstext":
+                    try
+                    {
+                        IList<string> wordList = new List<string>();
+                        Random rand = new Random();
+                        int max = Convert.ToInt32(message.Text.Split(" ", 2).Last());
+                        for (int i = 0; i < max; i++)
+                        {
+                            wordList.Add(words[rand.Next(0, words.Count)]);
+                        }
+                        if (wordList.Count < 300)
+                        {
+                            await botClient.SendTextMessageAsync(
+                                chatId: message.Chat,
+                                text: $"Your \"sentence\":\n" + String.Join(" ", wordList)
+                            );
+                        } else {
+                            await botClient.SendTextMessageAsync(
+                                chatId: message.Chat,
+                                text: $"Your \"sentence\":\n"
+                            );
+                            for (int i = 0; i < Math.Ceiling(wordList.Count/300.0); i++)
+                            {
+                                string str = "";
+                                for (int j = i*300; j < wordList.Count && j < 300+i*300; j++)
+                                {
+                                    str += wordList[j] + " ";
+                                }
+                                await botClient.SendTextMessageAsync(
+                                    chatId: message.Chat,
+                                    text: str
+                                );
+                                Thread.Sleep(5000);
+                            }
+                        }
+                        Console.WriteLine("Sended message");
+                    }
+                    catch (Exception a)
+                    {
+                        Console.WriteLine(Convert.ToString(a));
+                        await botClient.SendTextMessageAsync(
+                            chatId: message.Chat,
+                            text: $"Please specify the Amount of Words you want, separated by a space."
+                        );
+                    } 
                     break;
                 default:
                     if (message.Text[0] != Convert.ToChar("/")) return;
