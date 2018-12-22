@@ -26,7 +26,7 @@ namespace Awesome
 
         static void Main()
         {
-            botClient = new TelegramBotClient("726459976:AAGb5mHnQbFSOtf6mFCVhfBW4t4MuuFsStg");
+            botClient = new TelegramBotClient("YOUR ACCES TOKEN");
             string[] lines;
             var me = botClient.GetMeAsync().Result;
             Console.WriteLine($"Hello, World! I am user {me.Id} and my name is {me.FirstName}.");
@@ -97,7 +97,7 @@ namespace Awesome
                 }
             }
         }
-
+        
         static void Bot_OnMessage(object sender, MessageEventArgs e)
         {
             string[] commands = new string[] { "/test", "/name", "/zufallstext", "/klugeworte", "/coin" };
